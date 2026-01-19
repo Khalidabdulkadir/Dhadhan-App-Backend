@@ -84,6 +84,16 @@ DATABASES = {
     }
 }
 
+if os.environ.get('DB_ENGINE') == 'postgresql':
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('POSTGRES_DB', 'dhadhan_db'),
+        'USER': os.environ.get('POSTGRES_USER', 'dhadhan_user'),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'dhadhan_password'),
+        'HOST': os.environ.get('POSTGRES_HOST', 'db'),
+        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+    }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
