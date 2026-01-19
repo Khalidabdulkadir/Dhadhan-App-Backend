@@ -15,7 +15,7 @@ SECRET_KEY = 'django-insecure-change-me-in-production'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['api.sominnovations.xyz', '206.189.58.214', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['abi.sominnovations.xyz', '206.189.58.214', 'localhost', '127.0.0.1']
 
 
 # Application definition
@@ -161,7 +161,7 @@ SIMPLE_JWT = {
 
 # CORS Configuration
 CORS_ALLOW_ALL_ORIGINS = True
-CSRF_TRUSTED_ORIGINS = ['https://api.sominnovations.xyz', 'http://api.sominnovations.xyz', 'http://206.189.58.214']
+CSRF_TRUSTED_ORIGINS = ['https://abi.sominnovations.xyz', 'http://abi.sominnovations.xyz', 'http://206.189.58.214']
 
 # IntaSend Configuration
 INTASEND_PUBLISHABLE_KEY = os.environ.get('INTASEND_PUBLISHABLE_KEY', 'ISPubKey_test_aaf769df-c75f-4e9c-9548-95ba870dbba8')
