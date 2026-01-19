@@ -31,6 +31,7 @@ services:
       - certbot_www:/var/www/certbot
     ports:
       - "80:80"
+      - "443:443"
     depends_on:
       - web
 
