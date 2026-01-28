@@ -49,12 +49,17 @@ class Product(models.Model):
     calories = models.IntegerField(default=0)
     
     @property
-    def discounted_price(self):
+    def effective_discount_percentage(self):
         from decimal import Decimal
         prod_discount = Decimal(self.discount_percentage) if (self.is_promoted and self.discount_percentage > 0) else Decimal(0)
         rest_discount = self.restaurant.discount_percentage if self.restaurant else Decimal(0)
         
-        effective_discount = max(prod_discount, rest_discount)
+        return max(prod_discount, rest_discount)
+
+    @property
+    def discounted_price(self):
+        from decimal import Decimal
+        effective_discount = self.effective_discount_percentage
         
         if effective_discount > 0:
             return self.price * (1 - (effective_discount / Decimal(100)))

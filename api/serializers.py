@@ -43,7 +43,12 @@ class ProductSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Product
-        fields = ['id', 'name', 'description', 'price', 'image', 'category', 'rating', 'calories', 'is_hot', 'is_promoted', 'discount_percentage', 'discounted_price', 'shipping_fee', 'restaurant', 'restaurant_data']
+        fields = ['id', 'name', 'description', 'price', 'image', 'category', 'rating', 'is_hot', 'is_promoted', 'discount_percentage', 'discounted_price', 'shipping_fee', 'restaurant', 'restaurant_data']
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['discount_percentage'] = instance.effective_discount_percentage
+        return representation
 
 class OrderItemSerializer(serializers.ModelSerializer):
     product_name = serializers.ReadOnlyField(source='product.name')
