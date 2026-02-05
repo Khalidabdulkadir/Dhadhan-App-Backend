@@ -1,7 +1,7 @@
 
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import Category, Product, Order, OrderItem, Reel, SavedReel, Restaurant
+from .models import Category, Product, Order, OrderItem, Reel, SavedReel, Restaurant, ProductVariant, ProductAddOn
 
 User = get_user_model()
 
@@ -36,14 +36,28 @@ class CategorySerializer(serializers.ModelSerializer):
         model = Category
         fields = '__all__'
 
+class ProductVariantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductVariant
+        fields = ['id', 'name', 'price', 'is_default']
+
+class ProductAddOnSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductAddOn
+        fields = ['id', 'name', 'price', 'is_available']
+
 class ProductSerializer(serializers.ModelSerializer):
     discounted_price = serializers.ReadOnlyField()
     restaurant = serializers.PrimaryKeyRelatedField(queryset=Restaurant.objects.all(), required=False, allow_null=True)
     restaurant_data = RestaurantSerializer(source='restaurant', read_only=True)
+    variants = ProductVariantSerializer(many=True, read_only=True)
+    addons = ProductAddOnSerializer(many=True, read_only=True)
     
     class Meta:
         model = Product
-        fields = ['id', 'name', 'description', 'price', 'image', 'category', 'rating', 'is_hot', 'is_promoted', 'discount_percentage', 'discounted_price', 'shipping_fee', 'restaurant', 'restaurant_data']
+        fields = ['id', 'name', 'description', 'price', 'image', 'category', 'rating', 'is_hot', 
+                 'is_promoted', 'discount_percentage', 'discounted_price', 'restaurant', 
+                 'restaurant_data', 'variants', 'addons']
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -53,10 +67,12 @@ class ProductSerializer(serializers.ModelSerializer):
 class OrderItemSerializer(serializers.ModelSerializer):
     product_name = serializers.ReadOnlyField(source='product.name')
     product_image = serializers.ImageField(source='product.image', read_only=True)
+    variant_name = serializers.CharField(source='variant.name', read_only=True)
+    addons_names = serializers.StringRelatedField(source='addons', many=True, read_only=True)
 
     class Meta:
         model = OrderItem
-        fields = ['id', 'product', 'product_name', 'product_image', 'quantity', 'price']
+        fields = ['id', 'product', 'product_name', 'product_image', 'quantity', 'price', 'variant_name', 'addons_names']
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
@@ -67,7 +83,7 @@ class OrderSerializer(serializers.ModelSerializer):
         read_only_fields = ['user', 'total_amount', 'status', 'created_at']
 
 class CreateOrderSerializer(serializers.Serializer):
-    items = serializers.ListField(child=serializers.DictField(child=serializers.IntegerField()))
+    items = serializers.ListField(child=serializers.DictField())  # Changed to DictField for flexibility
     delivery_address = serializers.CharField(required=False, allow_blank=True)
     payment_method = serializers.CharField()
     phone_number = serializers.CharField(required=False, allow_blank=True)
@@ -84,19 +100,48 @@ class CreateOrderSerializer(serializers.Serializer):
         for item in items_data:
             product = Product.objects.get(id=item['id'])
             quantity = item['quantity']
-            # Use discounted price
-            price_per_unit = product.discounted_price
+            variant_id = item.get('variant_id')
+            addon_ids = item.get('addon_ids', [])
+            
+            # Determine Base Price
+            variant = None
+            if variant_id:
+                variant = ProductVariant.objects.get(id=variant_id)
+                base_price = variant.price
+            else:
+                base_price = product.discounted_price
+                
+            # Add Addons Price
+            addons_price = 0
+            selected_addons = []
+            if addon_ids:
+                selected_addons = ProductAddOn.objects.filter(id__in=addon_ids)
+                addons_price = sum(addon.price for addon in selected_addons)
+
+            # Final Unit Price
+            price_per_unit = base_price + addons_price
             price = price_per_unit * quantity
             total += price
+            
             order_items.append({
                 'product': product,
                 'quantity': quantity,
-                'price': price_per_unit
+                'price': price_per_unit,
+                'variant': variant,
+                'addons': selected_addons
             })
             
-        # Add delivery fee if applicable
-        if validated_data.get('delivery_address') and validated_data.get('delivery_address') != 'Pickup':
-            total += 500 # 500 KES delivery fee
+        # Add delivery fee logic
+        # For simplicity, using the first product's restaurant to determine delivery fee
+        # In a multi-restaurant cart, you might need more complex logic
+        delivery_fee = 0
+        if order_items:
+            first_prod = order_items[0]['product']
+            if first_prod.restaurant and validated_data.get('delivery_address') != 'Pickup':
+                fee = first_prod.restaurant.get_delivery_fee(total)
+                if fee is not None:
+                    delivery_fee = fee
+                    total += delivery_fee
             
         # Create Order
         order = Order.objects.create(
@@ -107,12 +152,15 @@ class CreateOrderSerializer(serializers.Serializer):
         
         # Create Order Items
         for item in order_items:
-            OrderItem.objects.create(
+            order_item = OrderItem.objects.create(
                 order=order,
                 product=item['product'],
                 quantity=item['quantity'],
-                price=item['price']
+                price=item['price'],
+                variant=item['variant']
             )
+            if item['addons']:
+                order_item.addons.set(item['addons'])
 
         # Handle M-Pesa Payment
         if validated_data.get('payment_method') == 'mpesa' and phone_number:

@@ -14,6 +14,70 @@ class Restaurant(models.Model):
     delivery_note = models.TextField(blank=True, help_text="Specific delivery instructions for this restaurant")
     is_popular = models.BooleanField(default=False)
     is_featured_campaign = models.BooleanField(default=False, help_text="Show as Hero Campaign on Home Screen")
+    slug = models.SlugField(unique=True, blank=True)
+    qr_code = models.ImageField(upload_to='restaurants/qrcodes/', blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from django.utils.text import slugify
+            import uuid
+            base_slug = slugify(self.name)
+            self.slug = f"{base_slug}-{uuid.uuid4().hex[:8]}"
+            
+        if not self.qr_code:
+            import qrcode
+            from io import BytesIO
+            from django.core.files import File
+            
+            # Use production URL structure
+            qr_data = f"https://dhadhan.app/restaurants/{self.slug}"
+            
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=4,
+            )
+            qr.add_data(qr_data)
+            qr.make(fit=True)
+            
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            buffer = BytesIO()
+            img.save(buffer, format="PNG")
+            file_name = f"qr_{self.slug}.png"
+            
+            self.qr_code.save(file_name, File(buffer), save=False)
+            
+        super().save(*args, **kwargs)
+
+    # Delivery Configuration
+    DELIVERY_MODE_CHOICES = (
+        ('FREE', 'Free Delivery'),
+        ('FIXED', 'Fixed Delivery Fee'),
+        ('CONFIRM', 'Confirm via Call/WhatsApp'),
+    )
+
+    delivery_mode = models.CharField(
+        max_length=20,
+        choices=DELIVERY_MODE_CHOICES,
+        default='CONFIRM',
+        help_text="Select how delivery fee is calculated"
+    )
+    fixed_delivery_fee = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        help_text="Required if Delivery Mode is 'Fixed'"
+    )
+    free_delivery_threshold = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        help_text="Order amount above which delivery is free (optional for Fixed mode)"
+    )
     
     # Payment Details
     bank_name = models.CharField(max_length=100, blank=True, null=True)
@@ -22,6 +86,35 @@ class Restaurant(models.Model):
     till_number = models.CharField(max_length=20, blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def get_delivery_fee(self, order_total):
+        """
+        Calculates delivery fee based on order total.
+        Returns:
+            - Decimal('0.00') for Free
+            - Decimal amount for Fixed
+            - None for 'Confirm via Call/WhatsApp'
+        """
+        from decimal import Decimal
+        
+        # Ensure order_total is Decimal
+        if not isinstance(order_total, Decimal):
+            try:
+                order_total = Decimal(str(order_total))
+            except:
+                order_total = Decimal('0.00')
+
+        if self.delivery_mode == 'FREE':
+            return Decimal('0.00')
+
+        if self.delivery_mode == 'FIXED':
+            # Check for free delivery threshold if set
+            if self.free_delivery_threshold and order_total >= self.free_delivery_threshold:
+                return Decimal('0.00')
+            return self.fixed_delivery_fee if self.fixed_delivery_fee else Decimal('0.00')
+
+        # Mode is CONFIRM
+        return None
 
     def __str__(self):
         return self.name
@@ -44,7 +137,6 @@ class Product(models.Model):
     is_hot = models.BooleanField(default=False, help_text="Show in Hot Products section")
     is_promoted = models.BooleanField(default=False)
     discount_percentage = models.IntegerField(default=0)
-    shipping_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Shipping fee for this product (0 for free)")
     rating = models.DecimalField(max_digits=3, decimal_places=1, default=5.0)
     calories = models.IntegerField(default=0)
     
@@ -68,6 +160,24 @@ class Product(models.Model):
     def __str__(self):
         return self.name
 
+class ProductVariant(models.Model):
+    product = models.ForeignKey(Product, related_name='variants', on_delete=models.CASCADE)
+    name = models.CharField(max_length=50)  # e.g., Small, Medium, Large
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    is_default = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.product.name} - {self.name}"
+
+class ProductAddOn(models.Model):
+    product = models.ForeignKey(Product, related_name='addons', on_delete=models.CASCADE)
+    name = models.CharField(max_length=50)  # e.g., Extra Cheese
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    is_available = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"+{self.name} ({self.price})"
+
 class Order(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
@@ -88,6 +198,8 @@ class Order(models.Model):
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    variant = models.ForeignKey(ProductVariant, on_delete=models.SET_NULL, null=True, blank=True)
+    addons = models.ManyToManyField(ProductAddOn, blank=True)
     quantity = models.IntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
     

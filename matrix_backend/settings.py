@@ -15,7 +15,7 @@ SECRET_KEY = 'django-insecure-change-me-in-production'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['abi.sominnovations.xyz', '206.189.58.214', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['0.0.0.0', 'abi.sominnovations.xyz', '206.189.58.214', 'localhost', '127.0.0.1', '192.168.0.124']
 
 
 # Application definition
@@ -127,7 +127,7 @@ USE_I18N = True
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
+# Static files (CSS, Java.pScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = '/static/'  # content: ensure leading slash

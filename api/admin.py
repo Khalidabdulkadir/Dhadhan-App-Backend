@@ -22,11 +22,22 @@ class OrderItemAdmin(admin.ModelAdmin):
 
 @admin.register(Restaurant)
 class RestaurantAdmin(admin.ModelAdmin):
-    list_display = ('name', 'discount_percentage', 'is_verified', 'is_popular', 'is_featured_campaign')
+    list_display = ('name', 'discount_percentage', 'is_verified', 'is_popular', 'is_featured_campaign', 'slug')
     list_editable = ('discount_percentage', 'is_verified', 'is_popular', 'is_featured_campaign')
+    readonly_fields = ('slug', 'qr_code')
     search_fields = ('name', 'location')
 
 @admin.register(Reel)
 class ReelAdmin(admin.ModelAdmin):
     list_display = ('product', 'is_highlight', 'views')
     list_editable = ('is_highlight',)
+
+@admin.register(ProductVariant)
+class ProductVariantAdmin(admin.ModelAdmin):
+    list_display = ('product', 'name', 'price', 'is_default')
+    list_filter = ('product', 'is_default')
+
+@admin.register(ProductAddOn)
+class ProductAddOnAdmin(admin.ModelAdmin):
+    list_display = ('product', 'name', 'price', 'is_available')
+    list_filter = ('product', 'is_available')
