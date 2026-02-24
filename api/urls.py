@@ -8,7 +8,7 @@ from rest_framework_simplejwt.views import (
 from .views import (
     CategoryViewSet, ProductViewSet, OrderViewSet, 
     RegisterView, UserProfileView, GoogleLoginView, UserViewSet,
-    ReelViewSet, RestaurantViewSet
+    ReelViewSet, RestaurantViewSet, UserDeleteView
 )
 
 router = DefaultRouter()
@@ -26,4 +26,5 @@ urlpatterns = [
     path('auth/google/', GoogleLoginView.as_view(), name='google_login'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/profile/', UserProfileView.as_view(), name='profile'),
+    path('auth/profile/delete/', UserDeleteView.as_view(), name='user_delete'),
 ]
