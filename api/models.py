@@ -118,16 +118,21 @@ class Restaurant(models.Model):
 
     def is_open_now(self):
         from django.utils import timezone
-        
         now = timezone.localtime(timezone.now())
         current_time = now.time()
         current_day = now.weekday()
         
         try:
-            opening_hour = self.opening_hours.get(day=current_day)
-            if opening_hour.is_closed:
+            oh = self.opening_hours.get(day=current_day)
+            if oh.is_closed:
                 return False
-            return opening_hour.opening_time <= current_time <= opening_hour.closing_time
+            
+            # Normal day (e.g., 08:00 to 22:00)
+            if oh.opening_time < oh.closing_time:
+                return oh.opening_time <= current_time <= oh.closing_time
+            # Overnight / Midnight (e.g., 18:00 to 02:00 or 06:00 to 00:00)
+            else:
+                return current_time >= oh.opening_time or current_time <= oh.closing_time
         except OpeningHour.DoesNotExist:
             return False
 
@@ -142,7 +147,13 @@ class Restaurant(models.Model):
                 return "Closed for the day"
             
             curr_time = now.time()
-            if oh.opening_time <= curr_time <= oh.closing_time:
+            is_open = False
+            if oh.opening_time < oh.closing_time:
+                is_open = oh.opening_time <= curr_time <= oh.closing_time
+            else:
+                is_open = curr_time >= oh.opening_time or curr_time <= oh.closing_time
+
+            if is_open:
                 return f"Open until {oh.closing_time.strftime('%I:%M %p')}"
             elif curr_time < oh.opening_time:
                 return f"Opens at {oh.opening_time.strftime('%I:%M %p')}"
