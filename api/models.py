@@ -116,6 +116,41 @@ class Restaurant(models.Model):
         # Mode is CONFIRM
         return None
 
+    def is_open_now(self):
+        from django.utils import timezone
+        
+        now = timezone.localtime(timezone.now())
+        current_time = now.time()
+        current_day = now.weekday()
+        
+        try:
+            opening_hour = self.opening_hours.get(day=current_day)
+            if opening_hour.is_closed:
+                return False
+            return opening_hour.opening_time <= current_time <= opening_hour.closing_time
+        except OpeningHour.DoesNotExist:
+            return False
+
+    def get_opening_status_text(self):
+        from django.utils import timezone
+        now = timezone.localtime(timezone.now())
+        current_day = now.weekday()
+        
+        try:
+            oh = self.opening_hours.get(day=current_day)
+            if oh.is_closed:
+                return "Closed for the day"
+            
+            curr_time = now.time()
+            if oh.opening_time <= curr_time <= oh.closing_time:
+                return f"Open until {oh.closing_time.strftime('%I:%M %p')}"
+            elif curr_time < oh.opening_time:
+                return f"Opens at {oh.opening_time.strftime('%I:%M %p')}"
+            else:
+                return "Closed for today"
+        except OpeningHour.DoesNotExist:
+            return "Hours not set"
+
     def __str__(self):
         return self.name
 
@@ -225,3 +260,60 @@ class SavedReel(models.Model):
 
     class Meta:
         unique_together = ('user', 'reel')
+
+class FavoriteFood(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorites')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='favorited_by')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'product')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.product.name}"
+
+class DirectOrder(models.Model):
+    ORDER_TYPE_CHOICES = (
+        ('whatsapp', 'WhatsApp'),
+        ('call', 'Call'),
+    )
+    
+    user = models.ForeignKey(User, related_name='direct_orders', on_delete=models.CASCADE)
+    restaurant = models.ForeignKey(Restaurant, related_name='direct_orders', on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, related_name='direct_orders', on_delete=models.SET_NULL, null=True, blank=True)
+    order_type = models.CharField(max_length=20, choices=ORDER_TYPE_CHOICES)
+    status = models.CharField(max_length=20, default='inquiry') # Since it's external, we just track it as an inquiry
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.order_type.capitalize()} Order to {self.restaurant.name} by {self.user.username}"
+
+class OpeningHour(models.Model):
+    WEEKDAYS = [
+        (0, 'Monday'),
+        (1, 'Tuesday'),
+        (2, 'Wednesday'),
+        (3, 'Thursday'),
+        (4, 'Friday'),
+        (5, 'Saturday'),
+        (6, 'Sunday'),
+    ]
+
+    restaurant = models.ForeignKey(Restaurant, related_name="opening_hours", on_delete=models.CASCADE)
+    day = models.IntegerField(choices=WEEKDAYS)
+    opening_time = models.TimeField()
+    closing_time = models.TimeField()
+    is_closed = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('restaurant', 'day')
+        ordering = ('day',)
+
+    def __str__(self):
+        if self.is_closed:
+            return f"{self.get_day_display()}: Closed"
+        return f"{self.get_day_display()}: {self.opening_time} - {self.closing_time}"

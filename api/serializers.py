@@ -1,7 +1,7 @@
 
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import Category, Product, Order, OrderItem, Reel, SavedReel, Restaurant, ProductVariant, ProductAddOn
+from .models import Category, Product, Order, OrderItem, Reel, SavedReel, Restaurant, ProductVariant, ProductAddOn, OpeningHour, FavoriteFood, DirectOrder
 
 User = get_user_model()
 
@@ -23,7 +23,18 @@ class RegisterSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(**validated_data)
         return user
 
+class OpeningHourSerializer(serializers.ModelSerializer):
+    day_display = serializers.CharField(source='get_day_display', read_only=True)
+
+    class Meta:
+        model = OpeningHour
+        fields = ['day', 'day_display', 'opening_time', 'closing_time', 'is_closed']
+
 class RestaurantSerializer(serializers.ModelSerializer):
+    is_open_now = serializers.BooleanField(read_only=True)
+    opening_status_text = serializers.CharField(source='get_opening_status_text', read_only=True)
+    opening_hours = OpeningHourSerializer(many=True, read_only=True)
+
     class Meta:
         model = Restaurant
         fields = '__all__'
@@ -47,6 +58,7 @@ class ProductAddOnSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'price', 'is_available']
 
 class ProductSerializer(serializers.ModelSerializer):
+    is_favorite = serializers.SerializerMethodField()
     discounted_price = serializers.ReadOnlyField()
     restaurant = serializers.PrimaryKeyRelatedField(queryset=Restaurant.objects.all(), required=False, allow_null=True)
     restaurant_data = RestaurantSerializer(source='restaurant', read_only=True)
@@ -57,7 +69,13 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = ['id', 'name', 'description', 'price', 'image', 'category', 'rating', 'is_hot', 
                  'is_promoted', 'discount_percentage', 'discounted_price', 'restaurant', 
-                 'restaurant_data', 'variants', 'addons']
+                 'restaurant_data', 'variants', 'addons', 'is_favorite']
+
+    def get_is_favorite(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return FavoriteFood.objects.filter(user=request.user, product=obj).exists()
+        return False
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -201,3 +219,20 @@ class SavedReelSerializer(serializers.ModelSerializer):
         model = SavedReel
         fields = ['id', 'user', 'reel', 'reel_details', 'saved_at']
         read_only_fields = ['user', 'saved_at']
+
+class FavoriteFoodSerializer(serializers.ModelSerializer):
+    product_details = ProductSerializer(source='product', read_only=True)
+    
+    class Meta:
+        model = FavoriteFood
+        fields = ['id', 'user', 'product', 'product_details', 'created_at']
+        read_only_fields = ['user', 'created_at']
+
+class DirectOrderSerializer(serializers.ModelSerializer):
+    restaurant_name = serializers.ReadOnlyField(source='restaurant.name')
+    product_name = serializers.ReadOnlyField(source='product.name')
+    
+    class Meta:
+        model = DirectOrder
+        fields = ['id', 'user', 'restaurant', 'restaurant_name', 'product', 'product_name', 'order_type', 'status', 'created_at']
+        read_only_fields = ['user', 'created_at']

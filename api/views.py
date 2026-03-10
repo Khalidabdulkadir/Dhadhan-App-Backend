@@ -3,11 +3,12 @@ from rest_framework import viewsets, permissions, status, generics
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.contrib.auth import get_user_model
-from .models import Category, Product, Order, Reel, SavedReel, Restaurant
+from .models import Category, Product, Order, Reel, SavedReel, Restaurant, FavoriteFood, DirectOrder
 from .serializers import (
     CategorySerializer, ProductSerializer, OrderSerializer, 
     RegisterSerializer, UserSerializer, CreateOrderSerializer,
-    ReelSerializer, SavedReelSerializer, RestaurantSerializer
+    ReelSerializer, SavedReelSerializer, RestaurantSerializer, FavoriteFoodSerializer,
+    DirectOrderSerializer
 )
 
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -145,6 +146,44 @@ class ReelViewSet(viewsets.ModelViewSet):
             return Response({'status': 'unsaved'})
         
         return Response({'status': 'saved'})
+
+class FavoriteFoodViewSet(viewsets.ModelViewSet):
+    serializer_class = FavoriteFoodSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return FavoriteFood.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=['post'])
+    def toggle(self, request):
+        product_id = request.data.get('product_id')
+        if not product_id:
+            return Response({'error': 'product_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            product = Product.objects.get(id=product_id)
+        except Product.DoesNotExist:
+            return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+        fav, created = FavoriteFood.objects.get_or_create(user=request.user, product=product)
+        
+        if not created:
+            fav.delete()
+            return Response({'status': 'unfavorited', 'is_favorite': False})
+            
+        return Response({'status': 'favorited', 'is_favorite': True})
+class DirectOrderViewSet(viewsets.ModelViewSet):
+    serializer_class = DirectOrderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return DirectOrder.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
 import requests
 from rest_framework.views import APIView

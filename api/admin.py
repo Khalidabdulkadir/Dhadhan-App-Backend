@@ -20,12 +20,17 @@ class OrderAdmin(admin.ModelAdmin):
 class OrderItemAdmin(admin.ModelAdmin):
     list_display = ('order', 'product', 'quantity', 'price')
 
+class OpeningHourInline(admin.TabularInline):
+    model = OpeningHour
+    extra = 7
+
 @admin.register(Restaurant)
 class RestaurantAdmin(admin.ModelAdmin):
     list_display = ('name', 'discount_percentage', 'is_verified', 'is_popular', 'is_featured_campaign', 'slug')
     list_editable = ('discount_percentage', 'is_verified', 'is_popular', 'is_featured_campaign')
     readonly_fields = ('slug', 'qr_code')
     search_fields = ('name', 'location')
+    inlines = [OpeningHourInline]
 
 @admin.register(Reel)
 class ReelAdmin(admin.ModelAdmin):
@@ -41,3 +46,8 @@ class ProductVariantAdmin(admin.ModelAdmin):
 class ProductAddOnAdmin(admin.ModelAdmin):
     list_display = ('product', 'name', 'price', 'is_available')
     list_filter = ('product', 'is_available')
+@admin.register(OpeningHour)
+class OpeningHourAdmin(admin.ModelAdmin):
+    list_display = ('restaurant', 'day', 'opening_time', 'closing_time', 'is_closed')
+    list_filter = ('day', 'is_closed')
+    search_fields = ('restaurant__name',)
