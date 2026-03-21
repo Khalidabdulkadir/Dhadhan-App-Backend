@@ -155,9 +155,14 @@ REST_FRAMEWORK = {
 # JWT Configuration
 from datetime import timedelta
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=365),
 }
+
+# Session Configuration
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 30  # 30 days
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_SAVE_EVERY_REQUEST = True
 
 # CORS Configuration
 CORS_ALLOW_ALL_ORIGINS = True
