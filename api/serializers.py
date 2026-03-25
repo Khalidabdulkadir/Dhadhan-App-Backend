@@ -62,12 +62,13 @@ class ProductSerializer(serializers.ModelSerializer):
     discounted_price = serializers.ReadOnlyField()
     restaurant = serializers.PrimaryKeyRelatedField(queryset=Restaurant.objects.all(), required=False, allow_null=True)
     restaurant_data = RestaurantSerializer(source='restaurant', read_only=True)
+    category_data = CategorySerializer(source='category', read_only=True)
     variants = ProductVariantSerializer(many=True, read_only=True)
     addons = ProductAddOnSerializer(many=True, read_only=True)
     
     class Meta:
         model = Product
-        fields = ['id', 'name', 'description', 'price', 'image', 'category', 'rating', 'is_hot', 
+        fields = ['id', 'name', 'description', 'price', 'image', 'category', 'category_data', 'rating', 'is_hot', 
                  'is_promoted', 'discount_percentage', 'discounted_price', 'restaurant', 
                  'restaurant_data', 'variants', 'addons', 'is_favorite']
 

@@ -10,7 +10,7 @@ from .serializers import (
     ReelSerializer, SavedReelSerializer, RestaurantSerializer, FavoriteFoodSerializer,
     DirectOrderSerializer
 )
-
+from .pagination import OptionalPagination
 from rest_framework_simplejwt.tokens import RefreshToken
 
 User = get_user_model()
@@ -60,6 +60,7 @@ class RestaurantViewSet(viewsets.ModelViewSet):
     queryset = Restaurant.objects.all()
     serializer_class = RestaurantSerializer
     permission_classes = (permissions.AllowAny,) # Update based on requirements, potentially IsAdminUser for write operations
+    pagination_class = OptionalPagination
 
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
@@ -77,6 +78,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     permission_classes = (permissions.AllowAny,)
+    pagination_class = OptionalPagination
     
     def get_queryset(self):
         queryset = Product.objects.all()
@@ -113,7 +115,7 @@ class ReelViewSet(viewsets.ModelViewSet):
     queryset = Reel.objects.all().order_by('-is_highlight', '-created_at')
     serializer_class = ReelSerializer
     permission_classes = (permissions.AllowAny,) # Allow viewing by anyone, adjust if needed (e.g., ReadOnly for public)
-
+    
     def get_parsers(self):
         if hasattr(self, 'action') and self.action in ['create', 'update', 'partial_update']:
              from rest_framework.parsers import MultiPartParser, FormParser
@@ -125,8 +127,8 @@ class ReelViewSet(viewsets.ModelViewSet):
         restaurant = self.request.query_params.get('restaurant')
         if restaurant:
              queryset = queryset.filter(restaurant_id=restaurant)
-        return queryset
 
+        return queryset
     @action(detail=True, methods=['post'], permission_classes=[permissions.AllowAny]) # Ideally IsAuthenticated
     def view(self, request, pk=None):
         reel = self.get_object()
